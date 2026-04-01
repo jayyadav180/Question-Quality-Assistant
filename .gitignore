@@ -1,9 +1,23 @@
+# Python
 __pycache__/
 *.pyc
-*.pkl
+*.pyo
+.env
+
+# Virtual environment
+venv/
+
+# Data — too large for GitHub, not needed
 data/*.csv
 data/*.json
-models/*.pkl
-.env
-venv/
+data/*.zip
+
+# Jupyter checkpoints — auto-generated noise
 .ipynb_checkpoints/
+
+# VS Code settings — personal, not project
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db

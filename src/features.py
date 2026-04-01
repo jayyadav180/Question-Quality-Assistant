@@ -1,20 +1,17 @@
 import re
 
 # ─────────────────────────────────────────────
-# UTILITY — strips HTML tags for clean text matching
-# This is critical because HQ/LQ_CLOSE are HTML
-# but we need clean text for regex pattern matching
+# UTILITY
 # ─────────────────────────────────────────────
 
 def clean_html(text):
-    """Remove HTML tags and decode common entities."""
     text = str(text)
-    text = re.sub(r'<.*?>', ' ', text)      # strip tags
-    text = text.replace('&lt;', '<')         # decode entities
+    text = re.sub(r'<.*?>', ' ', text)
+    text = text.replace('&lt;', '<')
     text = text.replace('&gt;', '>')
     text = text.replace('&amp;', '&')
     text = text.replace('&quot;', '"')
-    text = re.sub(r'\s+', ' ', text).strip() # normalize whitespace
+    text = re.sub(r'\s+', ' ', text).strip()
     return text
 
 
@@ -23,19 +20,10 @@ def clean_html(text):
 # ─────────────────────────────────────────────
 
 def title_word_count(title):
-    """
-    Measures title length in words.
-    Too short means vague. Sweet spot is 6-15 words.
-    """
     return len(str(title).split())
 
 
 def title_has_technology(title):
-    """
-    Detects if title mentions a specific technology.
-    A good title names exactly what you are working with
-    so the right people find and answer your question.
-    """
     technologies = [
         'python', 'java', 'javascript', 'typescript',
         'c++', 'c#', 'golang', 'rust', 'swift', 'kotlin',
@@ -45,7 +33,7 @@ def title_has_technology(title):
         'pandas', 'numpy', 'tensorflow', 'pytorch', 'keras',
         'html', 'css', 'php', 'ruby', 'rails', 'scala',
         'docker', 'kubernetes', 'aws', 'git', 'linux',
-        'r ', 'bash', 'powershell', 'jquery', 'bootstrap','react'
+        'bash', 'powershell', 'jquery', 'bootstrap'
     ]
     title_lower = str(title).lower()
     return 1 if any(tech in title_lower
@@ -53,27 +41,18 @@ def title_has_technology(title):
 
 
 def title_has_error_type(title):
-    """
-    Detects if title mentions a specific error name.
-    'TypeError in pandas' is immediately answerable.
-    'Python not working' tells responders nothing.
-    """
     pattern = (r'\b(TypeError|ValueError|AttributeError|'
                r'KeyError|IndexError|NameError|Exception|'
                r'SyntaxError|RuntimeError|ImportError|'
                r'NullPointerException|404|500|403|'
                r'OverflowError|ZeroDivisionError|'
-               r'FileNotFoundError|OSError|IOError)\b')
+               r'FileNotFoundError|OSError|IOError|'
+               r'leak|segfault|deadlock|race condition)\b')
     return 1 if re.search(pattern, str(title),
                           re.IGNORECASE) else 0
 
 
 def title_is_vague(title):
-    """
-    Detects vague complaint words in title.
-    These signal the asker hasn't defined their problem.
-    Returns 1 if vague — this is a negative signal.
-    """
     vague_words = [
         'help', 'issue', 'problem', 'not working',
         'broken', 'weird', 'strange', 'please',
@@ -90,59 +69,56 @@ def title_is_vague(title):
 # ─────────────────────────────────────────────
 
 def has_code_block(body):
-    """
-    Detects code in both HTML and plain text formats.
-    HQ and LQ_CLOSE use HTML tags.
-    Some questions use markdown backticks or indentation.
-    Covering all formats fixes the LQ_EDIT detection gap.
-    """
     body_str = str(body)
 
-    # HTML format — primary format in this dataset
     if '<code>' in body_str or '<pre>' in body_str:
         return 1
 
-    # Markdown format
+    # Triple backtick only — single backtick excluded
+    # because it appears in prose as inline variable names
     if '```' in body_str:
         return 1
 
-    # Indented code block (4 spaces or tab at line start)
     if re.search(r'\n(    |\t)\S', body_str):
         return 1
 
-    return 0
+    # Unformatted code detection — needs 2+ signals
+    unformatted_signals = [
+        r'\bimport\s+\w+',
+        r'\bfrom\s+\w+\s+import\b',
+        r'def\s+\w+\s*\(',
+        r'class\s+\w+[\s:(]',
+        r'\w+\s*=\s*\w+\s*\(',
+        r'if\s+.+:\s*$',
+        r'for\s+\w+\s+in\s+',
+        r'print\s*\(',
+        r'console\.log\s*\(',
+        r'df\[.+\]',
+        r'SELECT\s+.+FROM\s+',
+        r'\w+\.\w+\s*\(',
+    ]
+
+    matches = sum(
+        1 for p in unformatted_signals
+        if re.search(p, body_str,
+                     re.MULTILINE | re.IGNORECASE)
+    )
+    return 1 if matches >= 2 else 0
 
 
 def body_word_count(body):
-    """
-    Word count after stripping HTML.
-    Weak signal alone but useful in combination.
-    """
     return len(clean_html(body).split())
 
 
 def body_length_adequate(body):
-    """
-    Checks if body is in the quality sweet spot.
-    Under 50 words = underspecified.
-    Over 600 words = unfocused wall of text.
-    Sweet spot confirmed by EDA on this dataset.
-    """
     count = body_word_count(body)
     return 1 if 50 <= count <= 600 else 0
 
 
 def code_to_text_ratio(body):
-    """
-    Ratio of code content to total body length.
-    A technically specific question has proportionally
-    more code than prose — this captures that signal
-    in a way raw length cannot.
-    """
     body_str = str(body)
     code_blocks = re.findall(r'<code>(.*?)</code>',
                              body_str, re.DOTALL)
-    # Also catch markdown code blocks
     code_blocks += re.findall(r'```.*?```',
                               body_str, re.DOTALL)
     code_length = sum(len(c) for c in code_blocks)
@@ -153,15 +129,9 @@ def code_to_text_ratio(body):
 
 # ─────────────────────────────────────────────
 # BODY CONTENT FEATURES
-# These use clean_html() to strip tags before
-# matching so they work on both HTML and plain text
 # ─────────────────────────────────────────────
 
 def has_error_keywords(body):
-    """
-    Layer 1 — Detects explicit technical error terms.
-    Uses cleaned text so it works on all body formats.
-    """
     clean = clean_html(body).lower()
     patterns = [
         r'typeerror', r'valueerror', r'attributeerror',
@@ -178,11 +148,6 @@ def has_error_keywords(body):
 
 
 def has_colloquial_error(body):
-    """
-    Layer 2 — Informal error descriptions.
-    Catches natural language like 'I am getting an error'
-    even when no specific error type is named.
-    """
     clean = clean_html(body).lower()
     patterns = [
         r"i('m| am) (getting|facing|experiencing)",
@@ -198,12 +163,6 @@ def has_colloquial_error(body):
 
 
 def has_attempt_signal(body):
-    """
-    Layer 3 — Evidence that the user tried something.
-    This is the most important signal for avoiding
-    'do my work for me' closures on Stack Overflow.
-    Broadened patterns catch more natural phrasings.
-    """
     clean = clean_html(body).lower()
     patterns = [
         r"i('ve| have)? tried",
@@ -225,48 +184,60 @@ def has_attempt_signal(body):
 
 
 def has_expected_vs_actual(body):
-    """
-    Layer 4 — User defined expected vs actual outcome.
-    This transforms a vague complaint into a precise,
-    answerable question. Strong discriminative signal.
-    """
     clean = clean_html(body).lower()
     patterns = [
         r'expected',
         r'supposed to',
-        r'should (return|output|work|give|print|show)',
-        r'but (got|get|getting|returns?|gives?)',
+        r'should (return|output|work|give|print|show|update|change)',
+        r'but (got|get|getting|returns?|gives?|shows?|logs?)',
         r'instead (of|it)',
-        r'actually (returns?|outputs?|gives?)',
+        r'actually (returns?|outputs?|gives?|shows?)',
         r'want(ed)?.{0,30}but',
-        r'the (output|result|value|response) (is|was)',
+        r'the (output|result|value|response|count) (is|was)',
         r'(works|worked) (fine|correctly|well) but',
+        r'still (uses?|shows?|logs?|returns?) (the )?(old|previous|wrong|stale)',
+        r'(old|previous|stale|wrong) (value|state|data)',
+        r'i thought .{0,50} (would|should|will)',
+        r'assumed .{0,30} (would|should)',
+        r'(doesn\'t|does not) (reflect|update|change)',
+        r'not (getting|seeing|receiving) the (new|updated|latest|current)',
     ]
     return 1 if any(re.search(p, clean)
                     for p in patterns) else 0
 
 
 def has_question_mark(body):
-    """
-    Checks if body contains an actual question.
-    Many LQ posts are complaints or demands, not questions.
-    Presence of ? signals the asker wants a specific answer.
-    """
     return 1 if '?' in str(body) else 0
 
-def detect_question_archetype(title, body):
-    clean = clean_html(body).lower()
-    title_lower = str(title).lower()
-    combined = clean + ' ' + title_lower
 
-    # Explicit signal
-    if "no error" in combined or "without error" in combined:
+# ─────────────────────────────────────────────
+# ARCHETYPE DETECTION
+# Returns question type as string.
+# Used by feedback.py ONLY — never by ML model.
+# ─────────────────────────────────────────────
+
+def detect_question_archetype(title, body):
+    """
+    Identifies question type to apply appropriate
+    scoring rules in feedback.py.
+    
+    Returns: 'debugging' | 'behavioral' | 
+             'howto' | 'conceptual' | 'unknown'
+    """
+    clean   = clean_html(body).lower()
+    t_lower = str(title).lower()
+    combined = clean + ' ' + t_lower
+
+    # Explicit no-error signal overrides everything
+    if ('no error' in combined or
+            'without error' in combined):
         return 'behavioral'
 
     debugging_signals = [
         r'error:', r'traceback', r'exception',
         r'crash(es|ing)?', r'throws?',
-        r'stack trace',
+        r'stack trace', r'oserror', r'valueerror',
+        r'typeerror', r'syntaxerror',
     ]
 
     behavioral_signals = [
@@ -274,7 +245,7 @@ def detect_question_archetype(title, body):
         r'unexpected(ly)?', r'strange behavior',
         r'wrong value', r'stale value',
         r'(doesn\'t|does not) (update|change|reflect)',
-        r'async(hronous)?', r'timing',
+        r'async(hronous)?', r'timing issue',
         r'still (shows?|uses?|returns?) (the )?(old|previous|wrong)',
     ]
 
@@ -287,7 +258,7 @@ def detect_question_archetype(title, body):
 
     conceptual_signals = [
         r'why (does|is|do|would|can)',
-        r'what (does|is|are|happens)',
+        r'what (does|is|are|happens) .{0,20} mean',
         r'what happens when',
         r'is this (expected|normal|correct)',
         r'i don\'t understand',
@@ -296,47 +267,47 @@ def detect_question_archetype(title, body):
         r'when (should|would|do)',
     ]
 
-    if any(re.search(p, combined) for p in debugging_signals):
+    if any(re.search(p, combined)
+           for p in debugging_signals):
         return 'debugging'
 
-    if any(re.search(p, combined) for p in behavioral_signals):
+    if any(re.search(p, combined)
+           for p in behavioral_signals):
         return 'behavioral'
 
-    if any(re.search(p, combined) for p in howto_signals):
+    if any(re.search(p, combined)
+           for p in howto_signals):
         return 'howto'
 
-    if any(re.search(p, combined) for p in conceptual_signals):
+    if any(re.search(p, combined)
+           for p in conceptual_signals):
         return 'conceptual'
 
-    # fallback
-    if '?' in combined:
-        return 'conceptual'
-
+    # Honest fallback — unknown is valid
     return 'unknown'
 
+
 # ─────────────────────────────────────────────
-# METADATA FEATURES
+# METADATA
 # ─────────────────────────────────────────────
 
 def tag_count(tags):
-    """
-    Counts number of tags on the question.
-    Tags determine which experts see your question.
-    Stack Overflow allows 1-5 tags.
-    """
     if not tags or str(tags) == 'nan':
         return 0
     return len(re.findall(r'<[^>]+>', str(tags)))
 
 
 # ─────────────────────────────────────────────
-# MASTER FUNCTION
-# Runs all features on one question.
-# Returns a dict — becomes one row in feature matrix.
+# MASTER FUNCTIONS
+# Two versions — one for ML, one for feedback
 # ─────────────────────────────────────────────
 
 def extract_features(title, body, tags):
-    archetype = detect_question_archetype(title, body)
+    """
+    NUMERIC FEATURES ONLY.
+    Used by model.py for training and prediction.
+    Archetype excluded — string breaks ML model.
+    """
     return {
         'title_word_count':       title_word_count(title),
         'title_has_technology':   title_has_technology(title),
@@ -352,5 +323,16 @@ def extract_features(title, body, tags):
         'has_expected_vs_actual': has_expected_vs_actual(body),
         'has_question_mark':      has_question_mark(body),
         'tag_count':              tag_count(tags),
-        'question_archetype':     archetype,
     }
+
+
+def extract_features_with_meta(title, body, tags):
+    """
+    NUMERIC FEATURES + ARCHETYPE STRING.
+    Used by feedback.py and app.py ONLY.
+    Never passed to the ML model.
+    """
+    features = extract_features(title, body, tags)
+    features['detected_archetype'] = \
+        detect_question_archetype(title, body)
+    return features
