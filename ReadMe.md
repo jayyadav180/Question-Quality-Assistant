@@ -12,7 +12,7 @@ and tells you exactly what to fix.
 ## Why I Built This
 
 A large percentage of Stack Overflow questions never 
-get answered — not because the problem is hard, but 
+get answered not because the problem is hard, but 
 because the question is missing something basic: 
 a code example, an error message, a clear description 
 of what went wrong.
@@ -22,7 +22,7 @@ after posting. By then the question has already been
 downvoted or closed.
 
 I wanted to build something that catches these problems 
-before posting — a system that reads your draft question 
+before posting , a system that reads your draft question 
 and tells you specifically what is missing and why it 
 matters.
 
@@ -30,7 +30,7 @@ matters.
 
 ## What It Does
 
-You paste a draft question — title, body, and tags. 
+You paste a draft question :— title, body, and tags. 
 The system analyzes it and returns:
 
 - An overall quality score from 0 to 100 percent
@@ -68,11 +68,11 @@ high quality questions from those that get closed.
 A separate rule-based system evaluates the same 
 features independently and generates human-readable 
 suggestions. It first detects what type of question 
-is being asked — debugging, behavioral, how-to, or 
-conceptual — and applies appropriate rules for that 
-type. A debugging question is penalized for missing 
-a stack trace. A behavioral question is not, because 
-behavioral questions rarely have stack traces.
+is being asked such as debugging, behavioral, how-to, or 
+conceptual and applies appropriate rules for that 
+type. 
+ex: A debugging question is penalized for missing a stack trace. 
+A behavioral question is not, because behavioral questions rarely have stack traces.
 
 The ML layer and the rule-based layer are deliberately 
 kept separate. The model gives a probability. The rules 
@@ -94,16 +94,6 @@ extractor produced systematically wrong values for
 LQ_EDIT questions. I dropped this class entirely 
 rather than train on corrupted feature values. This 
 is documented as a known limitation.
-
-**Why I excluded user reputation from features**
-
-Stack Overflow questions from high-reputation users 
-get answered regardless of quality because the 
-community extends them goodwill. Including reputation 
-as a feature would teach the model to predict 
-community behavior rather than question quality. 
-The system is designed to evaluate the question 
-itself, not who wrote it.
 
 **Why the rule-based layer detects question archetype**
 
@@ -141,10 +131,11 @@ Baseline:   50% (random on balanced binary problem)
 66% on a balanced binary problem with known label 
 noise from reputation bias is a reasonable result 
 for structural features alone. The remaining error 
-is partly irreducible — community moderation 
+is partly irreducible community moderation 
 decisions are influenced by timing, reputation, 
 and visibility that no structural feature can 
-capture. A v2 with TF-IDF or sentence embeddings 
+capture. 
+A v2 with TF-IDF or sentence embeddings 
 would likely push accuracy toward 72-75%.
 
 ---
@@ -178,8 +169,8 @@ question-quality-assistant/
 
 The current system evaluates structure but not 
 meaning. Two questions can have identical structural 
-features — both have code blocks, both have error 
-messages — but one is a precise, well-formed question 
+features both have code blocks, both have error 
+messages but one is a precise, well-formed question 
 and the other is incoherent. Structural features 
 cannot distinguish between them.
 
