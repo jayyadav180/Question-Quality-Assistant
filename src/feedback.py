@@ -1,6 +1,6 @@
 # src/feedback.py
 #
-# This is the rule-based judgment layer of your system.
+# This is the rule-based judgment layer of system.
 # It runs AFTER feature extraction but INDEPENDENTLY
 # of the ML model. The model gives a probability score.
 # This layer gives human-readable explanations.
